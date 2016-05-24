@@ -1,13 +1,12 @@
 import faker from "faker";
 import Rx from "rx";
-import Immutable from "immutable";
+import _ from "lodash";
 
 const EVENT_INTERVAL = 1000;
 
 export function createGames(noOfGames = 5) {
-    const games = Immutable.Range(0, noOfGames)
-        .map(createGame)
-        .toArray();
+    const games = _.range(0, noOfGames)
+        .map(createGame);
 
     return Rx.Observable.combineLatest(...games, (...args) => args);
 }
@@ -26,29 +25,29 @@ export function createGame(delay) {
 }
 
 function updateGame(game) {
-    game = game.update("clock", (sec) => sec + 1);
+    game.clock++;
 
-    game = maybeUpdate(5, game, () => game.updateIn(["score", "home"], (s) => s + 1));
-    game = maybeUpdate(5, game, () => game.updateIn(["score", "away"], (s) => s + 1));
+    maybeUpdate(5, game, () => game.score.home++);
+    maybeUpdate(5, game, () => game.score.away++);
     
-    game = maybeUpdate(8, game, () => game.updateIn(["cards", "yellow"], (s) => s + 1));
-    game = maybeUpdate(2, game, () => game.updateIn(["cards", "red"], (s) => s + 1));
+    maybeUpdate(8, game, () => game.cards.yellow++);
+    maybeUpdate(2, game, () => game.cards.red++);
 
-    game = maybeUpdate(10, game, () => game.update("outrageousTackles", (t) => t + 1));
+    maybeUpdate(10, game, () => game.outrageousTackles++);
 
     const randomPlayerIndex = randomNum(0, 4);
     const effortLevel = randomNum();
     const invitedNextWeek = faker.random.boolean();
 
-    game = game.updateIn(["players", randomPlayerIndex], (player) => {
-        return player.set("effortLevel", effortLevel).set("invitedNextWeek", invitedNextWeek);
-    });
+    game.players[randomPlayerIndex].effortLevel = effortLevel;
+    game.players[randomPlayerIndex].invitedNextWeek = invitedNextWeek;
+    game.players[randomPlayerIndex].version++;
 
     return game;
 }
 
 function generateFakeGame() {
-    return Immutable.fromJS({
+    return {
         clock: 0,
         score: {
             home: 0,
@@ -64,11 +63,12 @@ function generateFakeGame() {
             red: 0
         },
         players: [1, 2, 3, 4, 5].map(generateFakePlayer)
-    });
+    };
 }
 
 function generateFakePlayer() {
     return {
+				version: 0,
         name: faker.name.findName(),
         effortLevel: randomNum(),
         invitedNextWeek: faker.random.boolean()
@@ -77,7 +77,7 @@ function generateFakePlayer() {
 
 function maybeUpdate(prob, game, fn) {
     const num = randomNum(0, 100);
-    return num <= prob ? fn(game) : game;
+    if (num <= prob) { fn(game); }
 }
 
 function randomNum(min, max) {
